@@ -1,5 +1,11 @@
 # @fatduckai/prompt-utils
 
+## 0.4.1
+
+### Patch Changes
+
+- d731c05: fix gh link
+
 ## 0.4.0
 
 ### Minor Changes
