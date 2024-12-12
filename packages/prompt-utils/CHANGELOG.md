@@ -1,5 +1,11 @@
 # @fatduckai/prompt-utils
 
+## 0.5.0
+
+### Minor Changes
+
+- 2ca55a3: simplified
+
 ## 0.4.1
 
 ### Patch Changes
