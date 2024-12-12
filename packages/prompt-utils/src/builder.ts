@@ -1,6 +1,9 @@
-import { Linter } from "./linter";
-import { Parser } from "./parser";
-import type { Block, ChatMessage } from "./types";
+import { ChatMessage } from "./types";
+
+interface PromptBuilderInput {
+  system: string;
+  user?: string;
+}
 
 interface PromptBuilderOptions {
   validateOnBuild?: boolean;
@@ -9,14 +12,12 @@ interface PromptBuilderOptions {
 }
 
 export class PromptBuilder {
-  private template: string;
+  private prompts: PromptBuilderInput;
   private context: Record<string, any> = {};
-  private linter: Linter;
   private readonly options: Required<PromptBuilderOptions>;
 
-  constructor(template: string, options: PromptBuilderOptions = {}) {
-    this.template = template;
-    this.linter = new Linter();
+  constructor(prompts: PromptBuilderInput, options: PromptBuilderOptions = {}) {
+    this.prompts = prompts;
 
     this.options = {
       validateOnBuild: true,
@@ -27,7 +28,6 @@ export class PromptBuilder {
   }
 
   withContext(context: Record<string, any>): this {
-    // Don't validate values if allowEmptyContent is true
     if (!this.options.allowEmptyContent) {
       Object.entries(context).forEach(([key, value]) => {
         if (
@@ -43,90 +43,54 @@ export class PromptBuilder {
     }
 
     this.context = { ...this.context, ...context };
-    this.linter = new Linter(this.context, this.options.allowEmptyContent);
     return this;
-  }
-
-  validate() {
-    try {
-      const parsed = Parser.parse(this.template);
-      const lintResults = this.linter.lint(parsed);
-
-      return {
-        isValid: !lintResults.some((r) => r.severity === "error"),
-        errors: lintResults
-          .filter((r) => r.severity === "error")
-          .map((e) => `Line ${e.line}: ${e.message}`),
-        warnings: lintResults
-          .filter((r) => r.severity === "warning")
-          .map((w) => `Line ${w.line}: ${w.message}`),
-        info: lintResults
-          .filter((r) => r.severity === "info")
-          .map((i) => `Line ${i.line}: ${i.message}`),
-      };
-    } catch (error) {
-      return {
-        isValid: false,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings: [],
-        info: [],
-      };
-    }
   }
 
   build(): ChatMessage[] {
     try {
-      if (this.options.validateOnBuild) {
-        const validation = this.validate();
-        if (!validation.isValid) {
-          throw new Error(
-            `Template validation failed:\n${validation.errors.join("\n")}`
-          );
-        }
-        if (this.options.throwOnWarnings && validation.warnings.length > 0) {
-          throw new Error(
-            `Template has warnings:\n${validation.warnings.join("\n")}`
-          );
-        }
+      if (!this.prompts.system?.trim()) {
+        throw new Error("System prompt is required");
       }
 
-      const parsed = Parser.parse(this.template);
+      const messages: ChatMessage[] = [];
+      let systemContent = this.prompts.system;
 
-      return parsed.blocks
-        .filter(
-          (block): block is Block =>
-            block.type === "system" ||
-            block.type === "user" ||
-            block.type === "assistant"
-        )
-        .map((block) => {
-          let content = block.content;
+      // Check if system prompt contains any variables
+      const hasVariables = /<[^>]+>/g.test(systemContent);
 
-          // Replace variables, converting undefined/null to empty string if allowEmptyContent is true
-          Object.entries(this.context).forEach(([key, value]) => {
-            const regex = new RegExp(`<${key}>`, "g");
-            const replacement =
-              value === undefined || value === null ? "" : String(value);
-            content = content.replace(regex, replacement);
-          });
-
-          if (!content.trim() && !this.options.allowEmptyContent) {
-            throw new Error(
-              `Empty content in ${block.type} block after variable replacement`
-            );
-          }
-
-          const message: ChatMessage = {
-            role: block.type,
-            content: content.trim(),
-          };
-
-          if (block.name) {
-            message.name = block.name;
-          }
-
-          return message;
+      if (hasVariables) {
+        // Replace variables in system prompt
+        Object.entries(this.context).forEach(([key, value]) => {
+          const regex = new RegExp(`<${key}>`, "g");
+          const replacement =
+            value === undefined || value === null ? "" : String(value);
+          systemContent = systemContent.replace(regex, replacement);
         });
+      } else if (Object.keys(this.context).length > 0) {
+        // If no variables but context exists, prepend context
+        const contextString = Object.entries(this.context)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join("\n");
+        systemContent = `${contextString}\n\n${systemContent}`;
+      }
+
+      if (!systemContent.trim() && !this.options.allowEmptyContent) {
+        throw new Error("Empty content in system prompt after processing");
+      }
+
+      messages.push({
+        role: "system",
+        content: systemContent.trim(),
+      });
+
+      if (this.prompts.user?.trim()) {
+        messages.push({
+          role: "user",
+          content: this.prompts.user.trim(),
+        });
+      }
+
+      return messages;
     } catch (error) {
       throw new Error(
         `Failed to build prompt: ${
