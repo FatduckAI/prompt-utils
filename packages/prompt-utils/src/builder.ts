@@ -63,14 +63,16 @@ export class PromptBuilder {
         Object.entries(this.context).forEach(([key, value]) => {
           const regex = new RegExp(`<${key}>`, "g");
           const replacement =
-            value === undefined || value === null ? "" : String(value);
+            value === undefined || value === null
+              ? ""
+              : this.formatValue(value);
           systemContent = systemContent.replace(regex, replacement);
         });
       } else if (Object.keys(this.context).length > 0) {
-        // If no variables but context exists, prepend context
+        // If no variables but context exists, prepend formatted context
         const contextString = Object.entries(this.context)
-          .map(([key, value]) => `${key}: ${value}`)
-          .join("\n");
+          .map(([key, value]) => `${key}:\n${this.formatValue(value)}`)
+          .join("\n\n");
         systemContent = `${contextString}\n\n${systemContent}`;
       }
 
@@ -98,5 +100,13 @@ export class PromptBuilder {
         }`
       );
     }
+  }
+  private formatValue(value: any): string {
+    if (typeof value === "object" && value !== null) {
+      // Handle arrays and objects by converting to formatted JSON
+      return JSON.stringify(value, null, 2);
+    }
+    // For primitive types, convert to string
+    return String(value);
   }
 }
