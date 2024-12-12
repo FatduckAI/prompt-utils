@@ -1,5 +1,11 @@
 # @fatduckai/prompt-utils
 
+## 0.5.1
+
+### Patch Changes
+
+- 4022b4f: fix stringify json
+
 ## 0.5.0
 
 ### Minor Changes
