@@ -6,10 +6,11 @@ _A lightweight and efficient prompt builder for LLM chat completions._
 
 ## Features
 
-- 🚀 Simple, declarative chat prompt templates
-- 🔍 Variable substitution with validation
-- ✅ Built-in lint checks
+- 🚀 Type-safe chat message construction
+- 🔍 Dynamic context injection
+- ✅ Variable substitution
 - 📝 TypeScript support
+- 🛡️ Built-in validation
 
 ## Installation
 
@@ -28,17 +29,15 @@ import { PromptBuilder } from "@fatduckai/prompt-utils";
 import OpenAI from "openai";
 
 async function main() {
-  const template = `
-    <system>You are a helpful AI assistant.</system>
-    <user>My name is <name> and I need help with <task></user>
-  `;
-
-  const builder = new PromptBuilder(template).withContext({
+  const builder = new PromptBuilder({
+    system: "You are a helpful AI assistant specialized in <language>.",
+    user: "Hi, I'm <name> and I need help with coding.",
+  }).withContext({
+    language: "TypeScript",
     name: "Alice",
-    task: "writing code",
   });
 
-  const messages = await builder.build();
+  const messages = builder.build();
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -51,83 +50,101 @@ async function main() {
 }
 ```
 
-## Template Format
+## Usage
 
-Templates use a simple XML-like syntax supporting system, user, and assistant messages:
+### Basic Chat Messages
 
 ```typescript
-const template = `
-  <system>System message here</system>
-  <user>User message with <variable></user>
-  <assistant>Assistant response here</assistant>
-`;
+const builder = new PromptBuilder({
+  system: "You are a helpful AI assistant.",
+  user: "Help me with TypeScript",
+});
+
+const messages = builder.build();
 ```
 
-## Configuration
+### Using Context Variables
 
 ```typescript
-const builder = new PromptBuilder(template, {
-  validateOnBuild: true, // Validate before building (default: true)
-  throwOnWarnings: false, // Throw error on warnings (default: false)
-  allowEmptyContent: false, // Allow empty messages (default: false)
+const builder = new PromptBuilder({
+  system:
+    "You are specialized in <language>. Your user is a <level> developer.",
+  user: "Help me understand the basics.",
+}).withContext({
+  language: "Python",
+  level: "beginner",
 });
+
+const messages = builder.build();
+```
+
+### Working with Data
+
+```typescript
+const metrics = [
+  { date: "2024-03-13", metric: "users", value: 1000 },
+  { date: "2024-03-14", metric: "users", value: 1200 },
+];
+
+const formattedData = metrics
+  .map((row) => `${row.date}: ${row.metric} = ${row.value}`)
+  .join("\n");
+
+const builder = new PromptBuilder({
+  system: "You are a data analyst AI.",
+  user: `Analyze this data:\n${formattedData}\n\nWhat are the trends?`,
+});
+
+const messages = builder.build();
+```
+
+## Configuration Options
+
+```typescript
+const builder = new PromptBuilder(
+  {
+    system: "System prompt here",
+    user: "User message here",
+  },
+  {
+    validateOnBuild: true, // Validate before building (default: true)
+    throwOnWarnings: false, // Throw error on warnings (default: false)
+    allowEmptyContent: false, // Allow empty messages (default: false)
+  }
+);
+```
+
+## Error Handling
+
+The builder performs validation to ensure:
+
+- System prompt is not empty
+- Context variables are properly defined
+- Content is not empty (when not allowed)
+- Variable substitution is valid
+
+```typescript
+try {
+  const builder = new PromptBuilder({
+    system: "Using variable <missing>",
+    user: "Test",
+  });
+
+  const messages = builder.build();
+} catch (error) {
+  console.error("Build failed:", error.message);
+}
 ```
 
 ## Examples
 
-The repository includes several examples demonstrating different use cases:
+Check the [examples](./examples) directory for more detailed examples including:
 
-### Basic Chat
-
-```bash
-bun examples/basic-chat.ts
-```
-
-Shows simple variable substitution and message building.
-
-### Multi-turn Conversations
-
-```bash
-bun examples/multi-turn.ts
-```
-
-Demonstrates how to create conversations with multiple turns.
-
-### Database Integration
-
-```bash
-bun examples/analytics.ts
-```
-
-Shows how to use the builder with database content.
-
-### OpenAI Integration
-
-```bash
-bun examples/openai-integration.ts
-```
-
-Complete example of using the builder with OpenAI's API.
-
-Check the [examples](./examples) directory for the full source code and more examples.
-
-## Error Handling
-
-The builder validates:
-
-- Template structure
-- Undefined variables
-- Empty content (when not allowed)
-- Invalid context values
-
-```typescript
-// Get validation results
-const validation = await builder.validate();
-if (!validation.isValid) {
-  console.error("Validation errors:", validation.errors);
-  console.warn("Warnings:", validation.warnings);
-}
-```
+- Basic chat message construction
+- Variable substitution
+- Database content integration
+- Error handling
+- OpenAI API integration
 
 ## License
 
