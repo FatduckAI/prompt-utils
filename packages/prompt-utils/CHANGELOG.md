@@ -1,5 +1,11 @@
 # @fatduckai/prompt-utils
 
+## 0.5.2
+
+### Patch Changes
+
+- 4b1422d: updated readme
+
 ## 0.5.1
 
 ### Patch Changes
